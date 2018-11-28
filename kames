@@ -1,0 +1,196 @@
+■■■■■expAllRev.bat
+@ECHO OFF
+setlocal enabledelayedexpansion
+
+SET CURRENT=%~d0%~p0
+%~d0
+CD %CURRENT%
+
+ECHO +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ECHO SVN一括エクスポート
+ECHO +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+REM 設定 この日付以降のリビジョンのみエクスポートする
+SET BASEDATE=20120101
+
+ECHO パスを入力
+SET TARGETPATH=%1
+IF "%TARGETPATH%"=="" (
+	SET /P TARGETPATH=
+)
+IF "%TARGETPATH%"=="" (
+	ECHO パス不正
+	EXIT /B
+)
+
+ECHO 以下ファイルをエクスポートします。
+ECHO 　%TARGETPATH%
+ECHO %BASEDATE%以降のリビジョンに限ります。
+
+SET TMPFILE1=%TMP%\svnlog%RANDOM%.txt
+SET TMPFILE2=%TMP%\svnRevList%RANDOM%.txt
+
+SET TIMESTAMP_DATE=%date:~-10,4%%date:~-5,2%%date:~-2,2%
+SET tmp=%time: =0%
+SET TIMESTAMP_TIME=%tmp:~0,2%%tmp:~3,2%%tmp:~6,2%
+SET TIMESTAMP=%TIMESTAMP_DATE%_%TIMESTAMP_TIME%
+SET OUTDIR=%CURRENT%out_%TIMESTAMP%
+
+MKDIR %OUTDIR%
+
+svn log %TARGETPATH%>%TMPFILE1%
+IF NOT %ERRORLEVEL%==0 (
+	ECHO SVNログ取得失敗
+	EXIT /B
+)
+Cscript script\getRevs.vbs %TMPFILE1% %TMPFILE2% //nologo
+FOR /F "tokens=1* delims=," %%I IN (%TMPFILE2%) DO (
+	IF %%J GEQ %BASEDATE% ( 
+		CALL :SVNEXP %TARGETPATH% %%I %%J
+	)
+)
+
+IF EXIST %TMPFILE1% DEL %TMPFILE1%
+IF EXIST %TMPFILE2% DEL %TMPFILE2%
+
+start "" "%OUTDIR%"
+
+EXIT /B
+
+:SVNEXP 
+svn export --force -r %2 %1 %OUTDIR%\%3_rev%2_%~n1%~x1
+EXIT /B
+-----------------------------
+■■■■■kame.bat
+@ECHO OFF
+setlocal enabledelayedexpansion
+
+ECHO +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ECHO TortoiseSVNのコマンドを実行します
+ECHO +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+SET TARGET=%1
+IF "%TARGET%"=="" (
+	ECHO パスを入力（URLまたはワークコピー）
+	SET /P TARGET=
+)
+ECHO 対象 %TARGET%
+ECHO.
+CALL :choce_record
+
+start TortoiseProc /command:%CMD% /path:"%TARGET%" %OPTION%
+
+EXIT /B
+
+
+REM ---------------------------------
+REM CSVファイルから選択させる
+REM ---------------------------------
+:choce_record
+SET CSV_FILE=kamelist.csv
+SET CNT=1
+FOR /F "tokens=1-3 delims=," %%I in (%CSV_FILE%) do (
+	 @echo !CNT!:[%%I] [%%J] [%%K]
+	 SET COL1_!CNT!=%%I
+	 SET COL2_!CNT!=%%J
+	 SET COL3_!CNT!=%%K
+	 SET /a CNT=!CNT!+1
+)
+ECHO コマンドを選択してください。
+SET /p USER_INPUT=＞＞
+IF [!COL1_%USER_INPUT%!]==[] (
+	ECHO 入力が不正です。
+	goto choce_record
+)
+SET CMD=!COL1_%USER_INPUT%!
+SET OPTION=!COL3_%USER_INPUT%!
+
+EXIT /B
+
+-----------------------------
+■■■■■kamelist.csv
+log,ログ,
+revert,変更の取り消し,
+diff,差分（ワークコピーとリポジトリ）,
+blame,ブレーム,Test
+cleanup,クリーンアップ（revert含む）,/noui /revert /delunversioned /delignored /refreshshell /externals
+cleanup,クリーンアップ（revertなし）,/noui /refreshshell /externals
+-----------------------------
+■■■■■kamelog.bat
+@ECHO OFF
+setlocal enabledelayedexpansion
+
+ECHO +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ECHO TortoiseSVNでログを開きます
+ECHO +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+ECHO.
+CALL :choce_record
+
+ECHO リビジョンを入力
+SET /P REV=
+
+start TortoiseProc /command:log /startrev:%REV% /endrev:%REV% /merge /path:%VERSION%
+
+EXIT /B
+
+
+REM ---------------------------------
+REM CSVファイルから選択させる
+REM ---------------------------------
+:choce_record
+SET CSV_FILE=kamelog.csv
+SET CNT=1
+FOR /F "tokens=1-3 delims=," %%I in (%CSV_FILE%) do (
+	 @echo !CNT!:%%I
+	 SET COL1_!CNT!=%%I
+	 SET /a CNT=!CNT!+1
+)
+ECHO リポジトリを選択
+SET /p USER_INPUT=＞＞
+IF [!COL1_%USER_INPUT%!]==[] (
+	ECHO 入力が不正です。
+	goto choce_record
+)
+SET VERSION=!COL1_%USER_INPUT%!
+
+EXIT /B
+
+-----------------------------
+■■■■■kamelog.csv
+C:\SVN
+-----------------------------
+■■■■■script\getRevs.vbs
+Dim fso
+Set fso = CreateObject("Scripting.FileSystemObject")
+Dim rFile
+Dim wFIle
+Set rFile = fso.OpenTextFile(Wscript.Arguments(0), 1)
+Set wFIle = fso.OpenTextFile(Wscript.Arguments(1), 2, True)
+
+Do while Not rFile.AtEndOfStream
+	Dim tl
+	Dim tmp
+	tl = rFile.ReadLine
+	If Instr(tl, "|") > 0 Then
+		If Left(tl, 1) = "r" Then
+			tmp = split(tl, "|")
+			Dim rev, hizuke
+			rev = Trim(replace(tmp(0), "r", ""))
+			hizuke = Replace(Mid(tmp(2), 2, 10), "-", "")
+			If IsNumeric(rev) Then
+				wFIle.WriteLine(rev & "," & hizuke)
+			End If
+		End If
+	End If
+Loop
+
+rFile.Close
+wFIle.Close
+
+Set rFile = Nothing
+Set wFIle = Nothing
+Set fso = Nothing
+
+
+-----------------------------
