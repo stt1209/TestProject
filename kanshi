@@ -1,0 +1,380 @@
+■■■■■readme.txt
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+監視
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+【機能】
+	フォルダ配下のファイル・フォルダを定期的にチェックし、
+	追加あるいは変更（更新日時をチェック）を検知したとき、メッセージを出します。
+	対象ファイル/オブジェクトに対してコマンドを実行することもできます。
+	
+【使い方】
+	list.txtに以下項目をCSVで記載し、「start.bat」を実行
+		・対象ファイル
+		・フォルダ
+		・チェックインターバル(秒)
+		・フォルダ検知時コマンド（任意）
+		・ファイル検知時コマンド（任意）
+		・コマンド実行時にアラート表示なし(1:True,1以外:False)
+	※～検知時コマンド
+		変更あるいは追加されたファイル/フォルダを検知したとき、cmd /c ～ で実行。
+		#パス#と記載すると、その部分が対象パスに置換されます。
+		
+		記載例:
+			copy /y "#パス#" "D:\work\"
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+-----------------------------
+■■■■■start.bat
+@ECHO OFF
+setlocal
+
+SET CURRENT=%~d0%~p0
+%~d0
+CD %CURRENT%
+
+type readme.txt
+
+ECHO 開始するには何かキーを押してください。
+pause>nul
+
+SET LOOP_FLG_FILE=%CURRENT%続行フラグファイル_このファイルを消すと停止します
+ECHO DUMMY>%LOOP_FLG_FILE%
+
+SET LOGFILE=%CURRENT%log\%date:~-10,4%%date:~-5,2%%date:~-2,2%.txt
+
+cscript script\kanshi.vbs "%CURRENT%list.txt" "%CURRENT%dircmd" "%LOOP_FLG_FILE%" "%LOGFILE%"
+
+-----------------------------
+■■■■■script
+-----------------------------
+■■■■■list.txt
+#名前(重複不可),フォルダパス,チェックインターバル(秒),フォルダ検知時コマンド,ファイル検知時コマンド,コマンド実行時にアラート表示なし(1:True 1以外:False)
+#  コマンド部に「#パス#」と記載すると、その部分が変更パスに置換されます。
+TEST,C:\SVN,60,,,0
+-----------------------------
+■■■■■script\kanshi.vbs
+Option Explicit
+
+Dim fso,shell
+
+'list.txt インターバルの単位
+Const ROOP_INTERVAL_MS = 1000
+'ファイル保存の単位
+Const SAVE_INTERVAL_CNT = 1800
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+Set shell = createObject("Wscript.Shell")
+
+Dim filePath_checkList, dirPath_data, loopFlgFile, logFilePath
+filePath_checkList = Wscript.Arguments(0)
+dirPath_data = Wscript.Arguments(1)
+loopFlgFile = Wscript.Arguments(2)
+logFilePath = Wscript.Arguments(3)
+
+Dim logFile
+Set logFile = fso.OpenTextFile(logFilePath, 8, True)
+Call log("起動", False)
+
+Dim checkAry
+Call log("チェック対象構成:" & filePath_checkList, True)
+'チェック対象辞書の構築
+checkAry = createCheckAry(filePath_checkList)
+
+'チェック実行(繰り返し)
+Dim checkCnt
+checkCnt = 0
+Do while fso.FileExists(loopFlgFile)
+	Call doCheck(checkAry)
+	Wscript.Sleep ROOP_INTERVAL_MS
+	checkCnt = checkCnt + 1
+	If checkCnt > SAVE_INTERVAL_CNT Then
+		'現在のチェック状態をファイル保存（次回起動時のため）
+		Call saveData(checkAry, dirPath_data)
+		checkCnt = 0
+	End IF
+Loop
+
+'現在のチェック状態をファイル保存（次回起動時のため）
+Call saveData(checkAry, dirPath_data)
+
+Call log("終了", False)
+logFile.Close
+Set shell = Nothing
+Set fso = Nothing
+
+'ログ
+Private Sub log(ByVal p_str, Byval p_withEcho)
+	If p_withEcho Then
+		Wscript.Echo p_str
+	End If
+	Call logFile.WriteLine(Now & " " & p_str)
+End Sub
+
+'チェック辞書作成
+Private Function createCheckAry(ByVal p_filePath)
+	Dim rFile
+	Set rFile = fso.OpenTextFile(p_filePath, 1)
+	Dim buf
+	Dim aCnt
+	Dim checkAry()
+	aCnt = 0
+	Do while Not rFile.AtEndOfStream
+		buf = rFile.ReadLine
+		If Left(buf, 1) <> "#" Then
+			Dim tmp
+			tmp = split(buf, ",")
+			Dim dm
+			Set dm = new DirManager
+			Call dm.setInfo(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5))
+			Dim loadFile
+			loadFile = dirPath_data & "\" & tmp(0) & ".txt"
+			Call log(tmp(0) & ":" & tmp(1) & ":" & tmp(2), True)
+			If fso.FileExists(loadFile) Then
+				Call log("ファイルから構築:" & loadFile, True)
+				Call dm.loadFromFile(loadFile)
+			Else
+				Call log("新規構築", True)
+				Call dm.createDictionary()
+				Call log("完了", True)
+			End If
+			ReDim Preserve checkAry(aCnt)
+			Set checkAry(UBound(checkAry)) = dm
+			aCnt = aCnt + 1
+		End If
+	Loop
+	rFile.Close
+	createCheckAry = checkAry
+End Function
+
+'チェック実行
+Private Function doCheck(ByRef p_dmAry)
+	Dim dm
+	For Each dm In p_dmAry
+		'チェックを実行
+		Call dm.checkDir
+	Next
+End Function
+
+'ファイル保存
+Public Sub saveData(ByRef p_dmAry, ByVal p_saveDir)
+	Dim dm
+	For Each dm In p_dmAry
+		Dim saveFile
+		saveFile = p_saveDir & "\" & dm.getName & ".txt"
+		Call dm.SaveAsFile(saveFile)
+	Next
+End Sub
+
+'フォルダ管理クラス
+Class DirManager
+	Private name
+	Private dirPath
+	Private fileDic
+	Private intervalCounter
+	Private interval
+	Private cmdForDir
+	Private cmdForFile
+	Private cmdWithNoAlert
+	
+	'イニシャライザ
+	Private Sub Class_initialize()
+		Set fileDic = CreateObject("Scripting.Dictionary")
+		intervalCounter = 0
+	End Sub
+	
+	'ターミネータ
+	Private Sub Class_Terminate()
+		Set fileDic = Nothing
+	End Sub
+	
+	'名前を取得
+	Public Function getName()
+		getName = name
+	End Function
+	
+	'名前・パス・インターバルをセット
+	Public sub setInfo(ByVal p_name, ByVal p_dirPath, ByVal p_interval, ByVal p_dirCmd, ByVal p_fileCmd, ByVal p_flg_cmdNoAlert)
+		name = p_name
+		dirPath = p_dirPath
+		interval = CInt(p_interval)
+		intervalCounter = interval
+		cmdForDir = p_dirCmd
+		cmdForFile = p_fileCmd
+		If p_flg_cmdNoAlert = "1" Then
+			cmdWithNoAlert = True
+		Else
+			cmdWithNoAlert = False
+		End If
+	End Sub
+	
+	'チェック実行（追加・変更を通知する。削除は通知せず、辞書だけ更新する）
+	Public Sub checkDir()
+		ReDim changedAry(0)
+		
+		'指定タイミング以外では何もせずExit
+		intervalCounter = intervalCounter + 1
+		If intervalCounter >= interval Then
+			intervalCounter = 0
+			Call log("チェック実行:" & name & ":" & intervalCounter & ":" & interval, True)
+		Else
+			Exit Sub
+		End If
+		
+		'ファイルとフォルダの変更/追加を検知し、changedAry配列へ追加
+		Dim tmpObj, cnt
+		cnt = 0
+		Dim tgtDir
+		'Wscript.Echo dirPath
+		Set tgtDir = fso.GetFolder(dirPath)
+		For Each tmpObj in tgtDir.Files
+			Call checkOneObj(tmpObj, changedAry, cnt)
+		Next
+		For Each tmpObj in tgtDir.SubFolders
+			Call checkOneObj(tmpObj, changedAry, cnt)
+		Next
+		
+		'削除を検知(通知はせず、辞書へ反映)
+		Dim tKey
+		For Each tKey In fileDic
+			If Not fso.FileExists(dirPath & "\" & tKey) And Not fso.FolderExists(dirPath & "\" & tKey) Then
+				Call log("ファイルが削除されています:" & tKey, True)
+				fileDic.Remove(tKey)
+			End If
+		Next
+		
+		'通知
+		Call alert(changedAry)
+		'コマンド実行
+		Call submitCmd(changedAry)
+	End Sub
+	
+	'1オブジェクト(ファイル or フォルダ)の更新日時をチェックする。変更あるいは新規であれば、changedAryへパスを追加
+	Private Sub checkOneObj(ByRef p_fileOrDir, ByRef p_changedAry, ByRef p_cnt)
+		Dim info
+		Dim changedFlg
+		On Error Resume Next
+		info = p_fileOrDir.DateLastModified
+		If Err.Number <> 0 Then
+			info = ""
+		End If
+		On Error Goto 0
+		IF info <> "" Then
+			changedFlg = False
+			If Not fileDic.Exists(p_fileOrDir.Name) Then
+				changedFlg = True
+			ElseIf Cstr(info) <> Cstr(fileDic(p_fileOrDir.Name)) Then
+				changedFlg = True
+			End If
+		End If
+		If changedFlg Then
+			If p_cnt <> UBound(p_changedAry) Then
+				Redim PreServe p_changedAry(p_cnt)
+			End If
+			p_changedAry(UBound(p_changedAry)) = p_fileOrDir.Path
+			p_cnt = p_cnt + 1
+			fileDic(p_fileOrDir.Name) = info
+		End If
+	End Sub
+	
+	'ファイル・フォルダで初期化
+	Public sub init(ByVal p_name, ByVal p_dirPath)
+		Call setInfo(p_name, p_dirPath)
+		Call createDictionary(p_dirPath)
+	End Sub
+	
+	'辞書を構築
+	Public sub createDictionary()
+		fileDic.RemoveAll
+		Dim tDir
+		Dim tFile
+		Call log(dirPath, True)
+		Set tDir = fso.GetFolder(dirPath)
+		For Each tFile In tDir.Files
+			fileDic(tFile.Name) = tFile.size & " " & tFile.DateLastModified
+		Next
+	End Sub
+	
+	'辞書をファイルから復元
+	Public sub loadFromFile(ByVal p_filePath)
+		fileDic.RemoveAll
+		Dim rFile
+		Set rFile = fso.OpenTextFile(p_filePath, 1)
+		Do while Not rFile.AtEndOfStream
+			Dim buf
+			buf = rFile.readLine
+			If buf <> "" Then
+				Dim tmp
+				tmp = split(buf, ",")
+				fileDic(tmp(0)) = tmp(1)
+			End If
+		Loop
+		rFile.close
+	End Sub
+	
+	'辞書をファイルとして保存
+	Public sub saveAsFile(ByVal p_filePath)
+		Dim wFile
+		Set wFile = fso.OpenTextFile(p_filePath, 2, True)
+		Dim tKey
+		For Each tKey In fileDic
+			Call wFile.WriteLine(tKey & "," & fileDic(tKey))
+		Next
+		wFile.Close
+		Set wFile = Nothing
+	End Sub
+	
+	'通知を実行
+	Public Sub alert(ByRef p_changedFileAry)
+		'変更なしなら終了
+		If p_changedFileAry(0) = "" Then
+			Exit Sub
+		End If
+		Dim buf
+		Dim tFile
+		For Each tFile In p_changedFileAry
+			buf = buf & vbNewLIne & tFile
+		Next
+		If Msgbox( "変更を検知しました。フォルダを開きますか？" & vbNewLine & buf, vbYesNo) = vbYes Then
+			Call shell.Run("cmd /c start """" " & dirPath)
+		End If
+	End Sub
+	
+	'コマンドを実行
+	Public Sub submitCmd(ByRef p_changedFileAry)
+		'変更なしなら終了
+		If p_changedFileAry(0) = "" Then
+			Exit Sub
+		End If
+		Dim tPath
+		For Each tPath In p_changedFileAry
+			Dim tmpCmd, oType
+			tmpCmd = ""
+			If fso.FileExists(tPath) And Trim(cmdForFile) <> "" Then
+				tmpCmd = cmdForFile
+				oType = "ファイル"
+			ElseIf fso.FolderExists(tPath) And Trim(cmdForDir) <> "" Then
+				tmpCmd = cmdForDir
+				oType = "フォルダ"
+			End If
+			
+			If tmpCmd <> "" Then
+				tmpCmd = Replace(tmpCmd, "#パス#", tPath)
+				Dim submitFlg
+				If cmdWithNoAlert Then
+					submitFlg =True
+				ElseIf Msgbox("以下の" & oType & "に対してコマンドを実行しますか？" & vbNewLine & tPath & vbNewLine & vbNewLine & "コマンド:" & tmpCmd, vbYesNo) = vbYes Then
+					submitFlg =True
+				End If
+				If submitFlg Then
+					Call log("コマンド実行 cmd /c " & tmpCmd, True)
+					Call shell.Run("cmd /c " & tmpCmd)
+				End If
+			End If
+		Next
+	End Sub
+	
+End Class
+-----------------------------
+フォルダたち
+dircmd
+log
+script
