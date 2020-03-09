@@ -1,0 +1,88 @@
+USE [Apriso]
+GO
+
+/****** Object:  Table [dbo].[test1]    Script Date: 2020/03/10 0:48:34 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[test1](
+	[id] [int] IDENTITY(1,1) NOT NULL,
+	[ival] [int] NULL,
+	[nval] [nvarchar](20) NOT NULL,
+	[fkey] [int] NULL,
+	[active] [bit] NOT NULL DEFAULT ((0)),
+PRIMARY KEY CLUSTERED 
+(
+	[id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+/****** Object:  Index [test1_idx1]    Script Date: 2020/03/10 0:48:34 ******/
+CREATE NONCLUSTERED INDEX [test1_idx1] ON [dbo].[test1]
+(
+	[ival] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+
+/****** Object:  Index [test1_idx2]    Script Date: 2020/03/10 0:48:34 ******/
+CREATE NONCLUSTERED INDEX [test1_idx2] ON [dbo].[test1]
+(
+	[fkey] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+
+
+
+
+insert into test1 values (1,'aaa',1,1);
+insert into test1 values (2,'aaa',2,1);
+insert into test1 values (3,'aaa',3,1);
+insert into test1 values (4,'aaa',4,1);
+insert into test1 values (5,'aaa',5,1);
+insert into test1 values (5,'aaa',6,1);
+insert into test1 values (5,'aaa',7,1);
+insert into test1 values (5,'aaa',8,1);
+insert into test1 values (5,'aaa',9,1);
+insert into test1 values (5,'aaa',10,1);
+insert into test1 values (11,'aaa',11,1);
+insert into test1 values (12,'aaa',12,1);
+insert into test1 values (13,'aaa',13,1);
+insert into test1 values (14,'aaa',14,1);
+insert into test1 values (15,'aaa',15,1);
+insert into test1 values (16,'aaa',16,1);
+insert into test1 values (17,'aaa',17,1);
+insert into test1 values (18,'aaa',18,0);
+insert into test1 values (19,'aaa',19,0);
+
+
+
+
+
+
+update test1 
+set nval = 'hh'
+where id = 204374;
+rollback;
+
+
+
+
+-- よいほう
+update test1
+set nval = 'ddd' 
+from test1 t1 WITH (INDEX([test1_idx1]))
+where
+ ival = 5
+ and fkey = 6
+ -- だめなほう
+ update test1
+set nval = 'ddd' 
+from test1 t1 WITH (INDEX([test1_idx2]))
+where
+ ival = 5
+ and fkey = 6
