@@ -1,0 +1,24 @@
+//キーボードマクロのファイル
+
+//不要文字の削除
+S_ReplaceAll('\\t', '', 4);	// すべて置換
+S_ReplaceAll('(?<!\\r)\\n|\\r(?!\\n)', ' ', 4);	// すべて置換
+S_ReplaceAll('"', '""', 4);	// すべて置換
+S_ReplaceAll('^[\\r\\n]+', '', 4);	// すべて置換
+
+//レコードの切れ目に<k>を埋めこみ
+S_ReplaceAll('^EVENT\\[\\d+\\]:', '<k>', 4);	// すべて置換
+//レコードの切れ目以外の改行を削除
+S_ReplaceAll('(?<!<K>)\\r\\n', ' ', 4);	// すべて置換
+//項目をTSVに
+S_ReplaceAll('  (Log Name|Source|Date|Event ID|Task|Level|Opcode|Keyword|User|User Name|Computer|Description): *', '\\t', 4);	// すべて置換
+
+//不要文字の削除
+S_ReplaceAll('^\\t', '', 4);	// すべて置換
+S_ReplaceAll('<k>', '', 4);	// すべて置換
+
+S_ReDraw(0);	// 再描画
+
+//見出し挿入
+S_GoFileTop();
+S_InsText("Log Name	Source	Date	Event ID	Task	Level	Opcode	Keyword	User	User Name	Computer	Description");
