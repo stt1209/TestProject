@@ -1,0 +1,36 @@
+Const DOC_WCDIR_DOCS = "D:\DOCS"
+Const DOC_WCDIR_REP = "H:\KAKUNOUPATH"
+
+Call Editor.ReplaceAll("\t", "    ", 4)
+Call Editor.ReplaceAll("^(.*?\\)([^\\]+\.)([^\\\.]+?)(\(\d+,\d+\).*?:)(.*)\r", "\2\3\t\3\t\1\2\3\t\4\t:\5\r", 4)
+Call Editor.ReplaceAll("^(?!.*\t)(.*?\\)([^\\]+?)(\(\d+,\d+\).*?:)(.*)\r", "\2\tdummy\t\1\2\t\3\t:\4\r", 4)
+Call Editor.ReplaceAll("^\r\n", "", 4)
+Call Editor.ReDraw(0)
+Dim header
+If isExcelGrep() Then
+	Call Editor.ReplaceAll("\ttxt\t(.*?\\)([\w\.]*ExcelGrep\\)(.*?)((\.txt)+)\t", "\t\3\t\1\2\3\4\t", 4)
+	Call Editor.ReplaceAll("\tFR\\", "\t" & Replace(DOC_WCDIR_IJHSH, "\", "\\") & "\\", 4)
+	Call Editor.ReplaceAll("\t00.frontRep\\", "\t" & Replace(DOC_WCDIR_REP, "\", "\\") & "\\", 4)
+	Call Editor.ReplaceAll("^(.*?)\.txt\t", "\1\t", 4)
+	header = "ファイル名\tファイルパス\tテキストパス\tヒット箇所\tヒット文字列(タブ置換済)"
+Else
+	header = "ファイル名\t拡張子\tファイルパス\tヒット箇所\tヒット文字列(タブ置換済)"
+End If
+Call Editor.ReplaceAll("^(    \(一致した行を出力\)\r\n)", "\1\r\n\r\n" & header & "\r\n", 4)
+Call Editor.ReDraw(0)
+
+'ExcelGrepフォルダ配下かどうか
+Private Function isExcelGrep()
+	Call Editor.SelectAll()
+	Dim buf
+	buf = Editor.getSelectedString()
+	
+	Editor.GoFileTop
+	Call Editor.ReDraw(0)
+	isExcelGrep = False
+	If Instr(buf, "ExcelGrep\") > 0 Then
+		If Msgbox("ExcelGrepフォルダ配下のGrepですか？", vbYesNo) = vbYes Then
+			isExcelGrep = True
+		End If
+	End If
+End Function
