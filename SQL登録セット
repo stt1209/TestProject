@@ -1,0 +1,103 @@
+@setlocal
+@Echo off
+REM execSql.bat
+
+SET MEMO=%1
+IF "%MEMO%"=="" (
+	ECHO 結果ファイルに付与するメモを入力してください
+	SET /P MEMO=
+)
+
+pushd %~pd0
+SET OUTDIR=D:\work\outdir
+SET OUTBANSE=%RANDOM%
+SET SQLNAME=tmp.sql
+SET SQLTEMPLATE=template.sql
+SET OUTFILE_SQLBK=%OUTDIR%\%OUTBANSE%_%MEMO%_0_sqlbk.sql
+SET OUTFILE_RESULT=%OUTDIR%\%OUTBANSE%_%MEMO%_1_result.txt
+
+SET SVNAME=localhost\SQLEXPRESS
+SET DBNAME=Setoriso
+SET USERNAME=aaa
+SET PWD=aaa
+
+REM -U %USERNAME% -P %PWD%
+
+COPY "%SQLNAME%" "%OUTFILE_SQLBK%"
+
+sqlcmd -S %SVNAME% -d %DBNAME% -i "%SQLNAME%" -o "%OUTFILE_RESULT%" -b
+
+START "" "%OUTFILE_RESULT%"
+IF %ERRORLEVEL%==0 (
+	REM 二重実行を防ぐために、sqlファイルを上書き
+	COPY /Y "%SQLTEMPLATE%" "%SQLNAME%"
+) ELSE (
+	ECHO SQL実行エラーが発生しました。
+)
+popd
+
+exit /b
+-- template.sql
+-- -------------------------------------------------------
+-- 登録/更新/削除SQL
+-- -------------------------------------------------------
+begin tran;
+
+
+
+insert into TEST4 (ival, nvarval, varval) values ('aaa', 'a', 'bb');
+insert into TEST4 (ival, nvarval, varval) values (12345, 'aa', 'bb');
+
+
+
+
+commit;
+
+-- -------------------------------------------------------
+-- 確認SQL（commit忘れ確認のため、一度ロールバックする）
+-- -------------------------------------------------------
+SELECT * FROM TEST4;
+
+
+
+
+
+
+
+-- -------------------------------------------------------
+-- 確認SQL（commit忘れ確認のため、一度ロールバックする）
+-- -------------------------------------------------------
+PRINT N'SQLが正常終了しました'
+
+-- tmp.sql
+-- -------------------------------------------------------
+-- 登録/更新/削除SQL
+-- -------------------------------------------------------
+begin tran;
+
+
+
+insert into TEST4 (ival, nvarval, varval) values ('aaa', 'a', 'bb');
+insert into TEST4 (ival, nvarval, varval) values (12345, 'aa', 'bb');
+
+
+
+
+commit;
+
+-- -------------------------------------------------------
+-- 確認SQL（commit忘れ確認のため、一度ロールバックする）
+-- -------------------------------------------------------
+SELECT * FROM TEST4;
+
+
+
+
+
+
+
+-- -------------------------------------------------------
+-- 確認SQL（commit忘れ確認のため、一度ロールバックする）
+-- -------------------------------------------------------
+PRINT N'SQLが正常終了しました'
+
