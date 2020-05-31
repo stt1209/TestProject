@@ -1,17 +1,24 @@
 
 -- +-+-+-+-+-+-+-+-+-+-+-+-+-+-
--- ‚¾‚¢‚½‚¢‚±‚¤‚È‚é
+-- ã ã„ãŸã„ã“ã†ãªã‚‹
 -- +-+-+-+-+-+-+-+-+-+-+-+-+-+-
 BEGIN TRY
-    BEGIN TRANSACTION        --ƒgƒ‰ƒ“ƒUƒNƒVƒ‡ƒ“‚ÌŠJŽn
-        --ƒ‹[ƒv
-        ``````
+    BEGIN TRANSACTION        --ãƒˆãƒ©ãƒ³ã‚¶ã‚¯ã‚·ãƒ§ãƒ³ã®é–‹å§‹
+        --ãƒ«ãƒ¼ãƒ—
+        ï½žï½žï½žï½žï½žï½ž
         end
-    COMMIT TRANSACTION       --ƒgƒ‰ƒ“ƒUƒNƒVƒ‡ƒ“‚ðŠm’è
+    COMMIT TRANSACTION       --ãƒˆãƒ©ãƒ³ã‚¶ã‚¯ã‚·ãƒ§ãƒ³ã‚’ç¢ºå®š
 END TRY
---—áŠOˆ—
+--ä¾‹å¤–å‡¦ç†
 BEGIN CATCH
-    ROLLBACK TRANSACTION     --ƒgƒ‰ƒ“ƒUƒNƒVƒ‡ƒ“‚ðŽæ‚èÁ‚µ
-    PRINT ERROR_MESSAGE()    --ƒGƒ‰[“à—e‚ð–ß‚·
+    ROLLBACK TRANSACTION     --ãƒˆãƒ©ãƒ³ã‚¶ã‚¯ã‚·ãƒ§ãƒ³ã‚’å–ã‚Šæ¶ˆã—
+    PRINT ERROR_MESSAGE()    --ã‚¨ãƒ©ãƒ¼å†…å®¹ã‚’æˆ»ã™
     PRINT 'ROLLBACK TRANSACTION'
 END CATCH
+
+
+-- ãƒˆãƒ©ãƒ³ã‚¶ã‚¯ã‚·ãƒ§ãƒ³æ•°
+SELECT @@TRANCOUNT 
+
+-- ãƒˆãƒ©ãƒ³ã‚¶ã‚¯ã‚·ãƒ§ãƒ³ãŒé–‹ã„ã¦ã„ã‚Œã°ãƒ­ãƒ¼ãƒ«ãƒãƒƒã‚¯
+if @@TRANCOUNT > 0 rollback;
