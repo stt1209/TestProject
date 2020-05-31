@@ -1,0 +1,16 @@
+declare @rootTable nvarchar(40);
+set @rootTable = 'TestFkeyTable2';
+WITH FKEYS
+AS
+(
+  SELECT fk.name name, object_name(parent_object_id) ftab
+         ,object_name(referenced_object_id) ttab
+   FROM sys.foreign_keys fk
+  WHERE object_name(fk.parent_object_id) = @rootTable 
+  UNION ALL
+  SELECT fk2.name name, object_name(fk2.parent_object_id) ftab,  object_name(fk2.referenced_object_id) ttab
+  FROM sys.foreign_keys as fk2, FKEYS
+  WHERE  object_name(fk2.parent_object_id) = FKEYS.ttab
+)
+SELECT  name, ftab, ttab FROM FKEYS
+ 
