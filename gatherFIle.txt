@@ -1,0 +1,23 @@
+@ECHO OFF
+setlocal
+
+CD /D %~dp0
+
+SET BASEDIR=G:\files\a
+SET OUTDIR=out_%RANDOM%
+MKDIR %OUTDIR%
+
+:start
+ECHO 収集対象のファイル名を入力（改行区切りで複数入力可能。終了したい場合は×で閉じるか入力せずにENTER）
+SET /P FILENAME=
+IF "%FILENAME%"=="" goto end
+FOR /R %BASEDIR% %%I IN (*) DO (
+	IF /i "%FILENAME%"=="%%~nxI" ECHO %%I && COPY "%%I" "%OUTDIR%\%%~nxI"
+)
+SET FILENAME=
+goto start
+
+:end
+EXIT /B
+
+
