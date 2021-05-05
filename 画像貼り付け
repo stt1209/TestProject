@@ -1,0 +1,29 @@
+    
+    'フォルダ配下の画像貼り付け(A4用、高速版)
+    Private Function pasteImgFilesInDir(ByRef dirObj As Variant) As Long
+        Dim pasteCounter As Long
+        Dim pasteRow As Long
+        pasteCounter = 0
+        pasteRow = 2
+        Dim pasteBatStatus As PASTE_BAT_STATUS
+        pasteBatStatus.pasteRow = 2
+        pasteBatStatus.prevNewPageRow = 1
+        pasteBatStatus.pbRowCnt = getRowCntPerPage
+        
+        Dim file As Variant
+        Dim fileCnt As Long
+        fileCnt = dirObj.Files.Count
+        For Each file In dirObj.Files
+            Dim extent As String
+            extent = LCase(Right(file, Len(file) - InStrRev(file, ".")))
+            If extent = "jpg" Or extent = "jpeg" Or extent = "gif" Or extent = "bmp" Or extent = "bmp" Or extent = "png" Then
+                pasteCounter = pasteCounter + 1
+                '画像ファイルを貼り付け
+                Call pasteOneImg(file, pasteCounter, pasteBatStatus)
+            End If
+            Application.StatusBar = dirObj.name & ":" & pasteCounter & "/" & fileCnt
+        Next
+        Cells(1, 1).Select
+        Application.StatusBar = False
+        pasteImgFilesInDir = pasteCounter
+    End Function
